@@ -1,0 +1,56 @@
+# GRPO Training Configuration
+# This file contains default hyperparameters for training with VERL
+
+# Model configuration
+model:
+  path: "Qwen/Qwen2.5-0.5B-Instruct"
+  use_remove_padding: true
+  enable_gradient_checkpointing: true
+
+# Data configuration
+data:
+  train_file: "data/gsm8k/train.parquet"
+  val_file: "data/gsm8k/test.parquet"
+  train_batch_size: 4
+  val_batch_size: 4
+  max_prompt_length: 512
+  max_response_length: 512
+  dataloader_num_workers: 2
+
+# Training configuration
+training:
+  experiment_name: "qwen-grpo-gsm8k"
+  checkpoint_dir: "checkpoints"
+  n_gpus: 1
+  nnodes: 1
+  val_before_train: false
+
+# GRPO algorithm configuration
+grpo:
+  # Number of response samples per prompt
+  rollout_n: 4
+  # Sampling temperature for generation
+  temperature: 0.8
+  # Learning rate for actor model
+  learning_rate: 1.0e-6
+  # PPO batch sizes
+  ppo_mini_batch_size: 4
+  ppo_micro_batch_size_per_gpu: 4
+  log_prob_micro_batch_size: 4
+
+# Inference configuration
+inference:
+  max_new_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+
+# Environment configuration
+environment:
+  pytorch_alloc_conf: "expandable_segments:True"
+  tokenizers_parallelism: "true"
+
+# Notes:
+# - Adjust batch_size and ppo_*_batch_size based on GPU memory
+# - Increase n_gpus for multi-GPU training
+# - Lower temperature for more deterministic outputs
+# - Increase rollout_n for more diverse samples (requires more memory)
