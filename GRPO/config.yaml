@@ -38,11 +38,11 @@ model:
 # Data Configuration
 data:
   train_files: "data/gsm8k/train.parquet"
-  val_files: "data/gsm8k/test.parquet"
+  val_files: "data/gsm8k/val.parquet"  # Validation split from training data
   train_batch_size: 8  # Increase for larger GPUs (A100: 16, 3090: 4)
   val_batch_size: 8
   max_prompt_length: 512  # Max input sequence length
-  max_response_length: 512  # Max output sequence length
+  max_response_length: 384  # Max output sequence length
   dataloader_num_workers: 4  # Parallel data loading (adjust based on CPU cores)
 
 # Rollout Configuration (Generation)
@@ -50,10 +50,10 @@ rollout:
   name: "vllm"  # Use vLLM for fast inference
   tensor_model_parallel_size: 1  # Multi-GPU: increase for model parallelism
   dtype: "float16"  # V100 optimized (use bfloat16 for A100)
-  n: 8  # Number of samples per prompt (A100: 16, 3090: 4)
+  n: 6  # Number of samples per prompt (A100: 16, 3090: 4)
   temperature: 0.8  # Sampling temperature for generation
-  log_prob_micro_batch_size: 8  # Batch size for log prob calculation
-  gpu_memory_utilization: 0.85  # Target GPU memory usage (A100: 0.90, 3090: 0.80)
+  log_prob_micro_batch_size: 4 # Batch size for log prob calculation
+  gpu_memory_utilization: 0.80  # Target GPU memory usage (A100: 0.90, 3090: 0.80)
 
 # Actor Training Configuration (Policy Optimization)
 actor:
@@ -77,17 +77,36 @@ trainer:
   nnodes: 1  # Number of nodes (for distributed training)
   total_epochs: 3  # Number of training epochs
   save_freq: 100  # Save checkpoint every N steps
-  val_before_train: false  # Run validation before training starts
+
+  # Validation settings
+  val_before_train: true  # Run validation before training starts
+  val_interval: 100  # Run validation every N steps
 
   # Optimization settings
   mixed_precision: "fp16"  # Mixed precision training (fp16 or bf16)
   max_grad_norm: 1.0  # Gradient clipping threshold
 
   # Logging
-  logger: ['console']  # Logger types
+  logger: ['console', 'wandb']  # Logger types (console and wandb)
   project_name: "qwen-grpo-gsm8k"
   experiment_name: "qwen-grpo-gsm8k"
   default_local_dir: "checkpoints/qwen-grpo-gsm8k"
+
+  # Wandb configuration
+  wandb:
+    enabled: true
+    project: "qwen-grpo-gsm8k"
+    entity: null  # Set your wandb username/team here
+    tags: ["grpo", "gsm8k", "qwen-0.5b", "v100"]
+    notes: "GRPO training on GSM8K with Qwen 0.5B"
+    # Key metrics to monitor:
+    # - critic/score/mean: Model correctness (training objective)
+    # - critic/rewards/mean: Whether reward is being learned
+    # - actor/entropy: Exploration level (decreases during training)
+    # - actor/ppo_kl: KL divergence (too large=divergence, 0=no update)
+    # - perf/throughput: Training throughput
+    # - timing_s/update_actor: Update time (slow=memory issue or deadlock)
+    # - response_length: Output length (too long=rambling, too short=collapse)
 
 # Environment Variables
 environment:

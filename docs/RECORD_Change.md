@@ -1,5 +1,48 @@
 # Change Record
 
+## 2025-12-11: Added Validation Split and Wandb Monitoring
+
+Enhanced dataset preparation and training monitoring with validation and wandb integration.
+
+### Data Preparation Changes (news_db/prepare_gsm8k.py)
+- Added `val_split_ratio` parameter (default 0.1) to create validation split
+- Splits training data into train/val (90%/10%) with seed=42 for reproducibility
+- Now generates three files: train.parquet, val.parquet, test.parquet
+- Test set remains separate for final evaluation
+
+### Configuration Updates (GRPO/config.yaml)
+- Changed `data.val_files` from test.parquet to val.parquet
+- Added `trainer.val_before_train=true` to validate before training
+- Added `trainer.val_interval=100` to validate every 100 steps
+- Added `trainer.logger=['console', 'wandb']` for dual logging
+- Added wandb configuration section with key metrics documentation:
+  - `critic/score/mean`: Model correctness (training objective)
+  - `critic/rewards/mean`: Reward learning progress
+  - `actor/entropy`: Exploration level (should decrease)
+  - `actor/ppo_kl`: KL divergence (stability indicator)
+  - `perf/throughput`: Training speed
+  - `timing_s/update_actor`: Update time (memory/deadlock indicator)
+  - `response_length`: Output length (quality indicator)
+
+### Training Script Updates (train_from_config.py)
+- Added validation interval parameter handling
+- Added wandb configuration integration
+- Conditionally adds wandb params if enabled in config
+
+### Dependencies (pyproject.toml)
+- Added `wandb>=0.16.0` for experiment tracking
+
+### Usage
+```bash
+# 1. Regenerate data with validation split
+uv run news_db/prepare_gsm8k.py
+
+# 2. Configure wandb in config.yaml (set entity to your username)
+
+# 3. Start training with validation and wandb
+uv run GRPO/train_from_config.py
+```
+
 ## 2025-12-11: Optimized Training Parameters for V100 32GB
 
 Optimized all training hyperparameters to maximize throughput and GPU utilization on Tesla V100 32GB.

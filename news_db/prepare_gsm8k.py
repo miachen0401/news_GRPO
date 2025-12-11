@@ -50,12 +50,19 @@ def format_gsm8k_example(example: dict, idx: int, split: str) -> dict:
     }
 
 
-def prepare_gsm8k_dataset(output_dir: str = "data/gsm8k") -> None:
+def prepare_gsm8k_dataset(
+    output_dir: str = "data/gsm8k",
+    val_split_ratio: float = 0.1
+) -> None:
     """
     Download and prepare GSM8K dataset for GRPO training.
 
+    Creates train and validation splits from the training data,
+    and keeps test set separate for final evaluation.
+
     Args:
         output_dir: Directory to save prepared dataset files
+        val_split_ratio: Ratio of training data to use for validation (default: 0.1)
     """
     logger.info("Starting GSM8K dataset preparation")
 
@@ -65,11 +72,25 @@ def prepare_gsm8k_dataset(output_dir: str = "data/gsm8k") -> None:
     logger.info("Loading GSM8K dataset from HuggingFace")
     dataset = load_dataset("openai/gsm8k", "main")
 
+    logger.info(f"Splitting training data (val_ratio={val_split_ratio})")
+    # Split training data into train and validation
+    train_val_split = dataset["train"].train_test_split(
+        test_size=val_split_ratio,
+        seed=42
+    )
+
     logger.info("Formatting training split")
-    train_dataset = dataset["train"].map(
+    train_dataset = train_val_split["train"].map(
         lambda x, i: format_gsm8k_example(x, i, "train"),
         with_indices=True,
         desc="Formatting train examples"
+    )
+
+    logger.info("Formatting validation split")
+    val_dataset = train_val_split["test"].map(
+        lambda x, i: format_gsm8k_example(x, i, "val"),
+        with_indices=True,
+        desc="Formatting val examples"
     )
 
     logger.info("Formatting test split")
@@ -80,17 +101,21 @@ def prepare_gsm8k_dataset(output_dir: str = "data/gsm8k") -> None:
     )
 
     train_output = output_path / "train.parquet"
+    val_output = output_path / "val.parquet"
     test_output = output_path / "test.parquet"
 
     logger.info(f"Saving training data to {train_output}")
     train_dataset.to_parquet(train_output)
+
+    logger.info(f"Saving validation data to {val_output}")
+    val_dataset.to_parquet(val_output)
 
     logger.info(f"Saving test data to {test_output}")
     test_dataset.to_parquet(test_output)
 
     logger.info(
         f"Dataset preparation complete. "
-        f"Train samples: {len(train_dataset)}, Test samples: {len(test_dataset)}"
+        f"Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}"
     )
 
     logger.info("Sample prompt:")

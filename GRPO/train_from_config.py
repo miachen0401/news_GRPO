@@ -95,14 +95,28 @@ def build_training_command(config: dict) -> list[str]:
         f"trainer.project_name={trainer_cfg['project_name']}",
         f"trainer.experiment_name={trainer_cfg['experiment_name']}",
         f"trainer.default_local_dir={trainer_cfg['default_local_dir']}",
-        f"++trainer.val_before_train={str(trainer_cfg['val_before_train']).lower()}",
         f"trainer.save_freq={trainer_cfg['save_freq']}",
         f"trainer.total_epochs={trainer_cfg['total_epochs']}",
+
+        # Validation settings
+        f"trainer.val_before_train={str(trainer_cfg['val_before_train']).lower()}",
+        f"trainer.val_interval={trainer_cfg['val_interval']}",
 
         # Optimization settings
         f"++trainer.mixed_precision={trainer_cfg['mixed_precision']}",
         f"++trainer.max_grad_norm={trainer_cfg['max_grad_norm']}",
     ]
+
+    # Add wandb configuration if enabled
+    if 'wandb' in trainer_cfg and trainer_cfg['wandb'].get('enabled', False):
+        wandb_cfg = trainer_cfg['wandb']
+        cmd.extend([
+            f"++trainer.wandb.project={wandb_cfg['project']}",
+            f"++trainer.wandb.tags={wandb_cfg['tags']}",
+            f"++trainer.wandb.notes={wandb_cfg['notes']}",
+        ])
+        if wandb_cfg.get('entity'):
+            cmd.append(f"++trainer.wandb.entity={wandb_cfg['entity']}")
 
     return cmd
 
