@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+debug*.log
 
 # env files
 .env
@@ -14,3 +15,8 @@ wheels/
 
 # large data files
 outputs/
+checkpoints/
+wandb/
+
+# carsh files
+core.*

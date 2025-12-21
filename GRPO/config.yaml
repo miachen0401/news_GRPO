@@ -50,7 +50,7 @@ rollout:
   name: "vllm"  # Use vLLM for fast inference
   tensor_model_parallel_size: 1  # Multi-GPU: increase for model parallelism
   dtype: "float16"  # V100 optimized (use bfloat16 for A100)
-  n: 6  # Number of samples per prompt (A100: 16, 3090: 4)
+  n: 4  # Number of samples per prompt (A100: 16, 3090: 4)
   temperature: 0.8  # Sampling temperature for generation
   log_prob_micro_batch_size: 4 # Batch size for log prob calculation
   gpu_memory_utilization: 0.80  # Target GPU memory usage (A100: 0.90, 3090: 0.80)
@@ -96,7 +96,7 @@ trainer:
   wandb:
     enabled: true
     project: "qwen-grpo-gsm8k"
-    entity: null  # Set your wandb username/team here
+    entity: ~  # Set your wandb username/team here
     tags: ["grpo", "gsm8k", "qwen-0.5b", "v100"]
     notes: "GRPO training on GSM8K with Qwen 0.5B"
     # Key metrics to monitor:

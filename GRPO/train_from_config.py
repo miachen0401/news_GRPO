@@ -11,6 +11,10 @@ import argparse
 from pathlib import Path
 import subprocess
 import yaml
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,6 +93,7 @@ def build_training_command(config: dict) -> list[str]:
         # Hardware configuration
         f"trainer.n_gpus_per_node={trainer_cfg['n_gpus_per_node']}",
         f"trainer.nnodes={trainer_cfg['nnodes']}",
+        "++trainer.torch_compile=False", # stabilize v100
 
         # Logging and checkpointing
         f"trainer.logger={trainer_cfg['logger']}",
@@ -99,8 +104,7 @@ def build_training_command(config: dict) -> list[str]:
         f"trainer.total_epochs={trainer_cfg['total_epochs']}",
 
         # Validation settings
-        f"trainer.val_before_train={str(trainer_cfg['val_before_train']).lower()}",
-        f"trainer.val_interval={trainer_cfg['val_interval']}",
+        f"trainer.val_before_train={str(trainer_cfg.get('val_before_train', False)).lower()}",
 
         # Optimization settings
         f"++trainer.mixed_precision={trainer_cfg['mixed_precision']}",
@@ -115,8 +119,8 @@ def build_training_command(config: dict) -> list[str]:
             f"++trainer.wandb.tags={wandb_cfg['tags']}",
             f"++trainer.wandb.notes={wandb_cfg['notes']}",
         ])
-        if wandb_cfg.get('entity'):
-            cmd.append(f"++trainer.wandb.entity={wandb_cfg['entity']}")
+        #if wandb_cfg.get('entity'):
+        #    cmd.append(f"++trainer.wandb.entity={wandb_cfg['entity']}")
 
     return cmd
 
@@ -163,6 +167,22 @@ def main():
     # Load configuration
     logger.info(f"Loading configuration from: {args.config}")
     config = load_config(args.config)
+
+    # Check for wandb API key in environment
+    wandb_api_key = os.getenv("WANDB_API_KEY")
+    if wandb_api_key:
+        logger.info("Found WANDB_API_KEY in environment")
+        # Auto-enable wandb if API key is present and wandb is in logger list
+        trainer_cfg = config.get('trainer', {})
+        if 'wandb' in trainer_cfg.get('logger', []):
+            if 'wandb' not in trainer_cfg:
+                trainer_cfg['wandb'] = {}
+            trainer_cfg['wandb']['enabled'] = True
+            logger.info("Wandb logging enabled (API key found)")
+        else:
+            logger.info("Wandb API key found but 'wandb' not in logger list. Add 'wandb' to config.yaml trainer.logger to enable.")
+    else:
+        logger.info("No WANDB_API_KEY in environment. Wandb logging disabled.")
 
     # Validate configuration
     validate_config(config)
