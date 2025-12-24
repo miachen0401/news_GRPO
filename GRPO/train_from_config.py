@@ -37,8 +37,14 @@ def set_environment_variables(config: dict) -> None:
     # PyTorch and tokenizer settings
     os.environ["PYTORCH_ALLOC_CONF"] = env_config.get('pytorch_alloc_conf', 'expandable_segments:True')
     os.environ["TOKENIZERS_PARALLELISM"] = env_config.get('tokenizers_parallelism', 'true')
+    
+    # Reward logging configuration
+    os.environ["REWARD_LOG_SAMPLE_RATE"] = str(env_config.get('reward_log_sample_rate', '25'))
+    os.environ["REWARD_ENABLE_LOGGING"] = str(env_config.get('reward_enable_logging', 'true'))
 
     logger.info("Environment variables configured")
+    logger.info(f"  - Reward logging: {'enabled' if env_config.get('reward_enable_logging', 'true').lower() == 'true' else 'disabled'}")
+    logger.info(f"  - Log sample rate: every {env_config.get('reward_log_sample_rate', '25')} questions")
 
 
 def build_training_command(config: dict) -> list[str]:

@@ -8,9 +8,9 @@
 # Model Configuration
 model:
   path: "Qwen/Qwen2.5-1.5B-Instruct"  # HuggingFace model path, "Qwen/Qwen2.5-0.5B-Instruct"
-  use_remove_padding: false  # Set to false for V100 (Flash Attention issue)
+  use_remove_padding: true  # Enable for Flash Attention 2 (A100/H100 recommended)
   enable_gradient_checkpointing: true  # Save memory
-  attn_implementation: "sdpa"  # Use SDPA instead of Flash Attention
+  attn_implementation: "flash_attention_2"  # Use Flash Attention 2 for better performance
 
 # Data Configuration
 data:
@@ -90,3 +90,6 @@ trainer:
 environment:
   pytorch_alloc_conf: "expandable_segments:True"
   tokenizers_parallelism: "true"
+  # Reward logging configuration
+  reward_log_sample_rate: "25"  # Log every 25 questions for monitoring
+  reward_enable_logging: "true"  # Enable detailed logging of samples

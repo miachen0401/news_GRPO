@@ -1,0 +1,83 @@
+# GRPO Test Configuration
+# Optimized for quick training loop testing with small dataset (50 samples)
+# Use this for debugging and validating your setup before full training
+
+# Model Configuration
+model:
+  path: "Qwen/Qwen2.5-1.5B-Instruct"
+  use_remove_padding: true  # Enable for Flash Attention 2 (A100/H100 recommended)
+  enable_gradient_checkpointing: true  # Save memory
+  attn_implementation: "flash_attention_2"
+
+# Data Configuration - Small test dataset
+data:
+  train_files: "data/gsm8k/train.parquet"  # 50 samples
+  val_files: "data/gsm8k/val.parquet"      # 10 samples
+  train_batch_size: 2  # Smaller batch for faster testing
+  val_batch_size: 1
+  max_prompt_length: 512
+  max_response_length: 256
+  dataloader_num_workers: 2  # Reduced for test
+
+# Rollout Configuration
+rollout:
+  name: "vllm"
+  tensor_model_parallel_size: 1
+  dtype: "float16"
+  n: 4  # Keep same for testing
+  temperature: 0.8
+  do_sample: true
+  log_prob_micro_batch_size: 2
+  gpu_memory_utilization: 0.45
+
+# Actor Training Configuration
+actor:
+  learning_rate: 1.0e-6
+  ppo_mini_batch_size: 1
+  ppo_micro_batch_size_per_gpu: 1
+  ppo_epochs: 1
+
+# Algorithm Configuration
+algorithm:
+  adv_estimator: "grpo"
+
+# Reward Function Configuration
+reward:
+  path: "GRPO/gsm8k_reward_grpo_format.py"
+  function_name: "compute_score"
+
+# Training Configuration - Optimized for testing
+trainer:
+  n_gpus_per_node: 1
+  nnodes: 1
+  total_epochs: 1  # Only 1 epoch for testing
+  save_freq: 0  # Disable checkpointing for test
+
+  val_before_train: false
+  val_interval: 0
+
+  mixed_precision: "fp16"
+  max_grad_norm: 1.0
+
+  # Logging
+  logger: ['console']  # Console only for quick testing
+  project_name: "qwen-grpo-test"
+  experiment_name: "qwen-grpo-test-run"
+  default_local_dir: "checkpoints/test"
+
+  # Wandb disabled by default for testing
+  # To enable: set WANDB_API_KEY and add 'wandb' to logger list above
+  wandb:
+    enabled: false
+    project: "qwen-grpo-test"
+    entity: ~
+    tags: ["test", "grpo", "gsm8k", "v100"]
+    notes: "Test run with 50 samples to validate training loop"
+
+# Environment Variables
+environment:
+  pytorch_alloc_conf: "expandable_segments:True"
+  tokenizers_parallelism: "true"
+  # Reward logging configuration
+  reward_log_sample_rate: "25"  # Log every 25 questions for monitoring
+  reward_enable_logging: "true"  # Enable detailed logging of samples

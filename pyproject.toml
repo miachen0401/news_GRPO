@@ -18,6 +18,8 @@ dependencies = [
     "bitsandbytes>=0.45.0",
     "pyyaml>=6.0",
     "wandb>=0.16.0",
+    "flash-attn>=2.6.0",
+    "verl @ git+https://github.com/volcengine/verl.git",
 ]
 
 [project.optional-dependencies]
@@ -25,3 +27,8 @@ dev = [
     "jupyter>=1.0.0",
     "ipykernel>=6.29.0",
 ]
+
+[tool.uv]
+
+[tool.uv.extra-build-dependencies]
+flash-attn = ["torch", "packaging", "ninja"]
