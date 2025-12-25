@@ -252,6 +252,8 @@ def main():
 
     # Initialize validation plugin
     validation_plugin = None
+    last_logged_val_step = -1
+
     if VALIDATION_AVAILABLE:
         try:
             validation_plugin = create_validation_plugin(config)
@@ -290,7 +292,31 @@ def main():
                 print(line, end='')  # Print to console
                 log_f.write(line)    # Write to file
                 log_f.flush()        # Ensure it's written immediately
-            
+
+                if validation_plugin and WANDB_AVAILABLE and wandb.run is not None:
+                    try:
+                        history = validation_plugin.get_metrics_history()
+                        if history:
+                            latest = history[-1]
+                            step = latest.get("step", -1)
+
+                            if step > last_logged_val_step:
+                                wandb.log(
+                                    {
+                                        "val/pass@1": latest["pass@1"],
+                                        "val/pass@5": latest["pass@5"],
+                                    },
+                                    step=step,
+                                )
+                                last_logged_val_step = step
+                                logger.info(
+                                    f"✓ Logged validation to wandb at step {step}: "
+                                    f"pass@1={latest['pass@1']:.4f}, "
+                                    f"pass@5={latest['pass@5']:.4f}"
+                                )
+                    except Exception as e:
+                        logger.debug(f"Validation wandb logging skipped: {e}")
+                        
             process.wait()
             
             if process.returncode != 0:
@@ -305,6 +331,7 @@ def main():
     finally:
         # Stop validation plugin
         if validation_plugin:
+            validation_plugin._run_validation(step="final")
             validation_plugin.stop()
 
 
