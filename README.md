@@ -80,7 +80,7 @@ This creates `data/gsm8k/train.parquet` and `data/gsm8k/test.parquet`.
 
 Start training with default configuration:
 ```bash
-uv run GRPO/train_grpo.py
+uv run GRPO/train_from_config.py --config GRPO/config_test.yaml --validate_only
 ```
 
 Customize training parameters:

@@ -47,7 +47,7 @@ def format_gsm8k_example(example: dict, idx: int, split: str, prompt_format: str
     return {
         "data_source": "gsm8k",
         "prompt": prompt_messages,
-        "ability": "math",
+        "ability": "gsm8k",
         "reward_model": {
             "style": "rule",
             "ground_truth": example["answer"]

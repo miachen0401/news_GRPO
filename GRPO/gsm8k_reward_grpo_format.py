@@ -276,7 +276,11 @@ def compute_score(
     
     # Compute binary accuracy for logging only
     extracted = extract_answer(solution_str)
-    is_correct = 1.0 if extracted == str(ground_truth) else 0.0
+    # Extract ground truth answer for comparison
+    ground_truth_extracted = ground_truth.split('####')[-1].strip() if '####' in ground_truth else ground_truth.strip()
+    # Binary accuracy for logging: correctness maxes out at 2.0 (exact match).
+    # The previous threshold (>= 2.5) made accuracy always 0.0.
+    is_correct = 1.0 if correctness >= 2.0 else 0.0
 
     # Log sample outputs periodically for monitoring (every N questions)
     if _ENABLE_LOGGING and _call_counter % _LOG_SAMPLE_RATE == 0:
@@ -290,9 +294,9 @@ def compute_score(
 📊 ROLLOUT SAMPLE #{_call_counter // _LOG_SAMPLE_RATE} (Call #{_call_counter})
 {"=" * 100}
 
-✓ GROUND TRUTH: {ground_truth}
+✓ GROUND TRUTH: {ground_truth_extracted}
 
-🤖 MODEL ANSWER: {extracted}  {'✓ CORRECT' if extracted == str(ground_truth) else '✗ INCORRECT'}
+🤖 MODEL ANSWER: {extracted}  {'✓ CORRECT' if is_correct == 1.0 else '✗ INCORRECT'}
 
 {"-" * 100}
 📈 REWARD BREAKDOWN:
@@ -324,40 +328,6 @@ def compute_score(
         
         # Also print to stdout (Ray might capture this)
         print(log_msg, flush=True)
-
-        # Also try to import wandb and log there if available
-        try:
-            import wandb
-            if wandb.run is not None:
-                # Create a formatted table for wandb
-                output_table = f"""
-                <div style='font-family: monospace; padding: 10px;'>
-                <h3>Sample #{_call_counter // _LOG_SAMPLE_RATE}</h3>
-                <p><strong>Question:</strong><br/>{question}</p>
-                <p><strong>Ground Truth:</strong> {ground_truth}</p>
-                <p><strong>Model Answer:</strong> {extracted}</p>
-                <p><strong>Correct:</strong> {'✓ YES' if extracted == str(ground_truth) else '✗ NO'}</p>
-                <hr/>
-                <p><strong>Full Output:</strong></p>
-                <pre>{display_output}</pre>
-                </div>
-                """
-                
-                wandb.log({
-                    "sample/reward_total": total_reward,
-                    "sample/reward_correctness": correctness,
-                    "sample/reward_digit": digit,
-                    "sample/reward_format": hard_format,
-                    "sample/reward_mark": mark,
-                    "sample/question": question,
-                    "sample/ground_truth": str(ground_truth),
-                    "sample/extracted_answer": extracted,
-                    "sample/is_correct": 1.0 if extracted == str(ground_truth) else 0.0,
-                    "sample/output_html": wandb.Html(output_table),
-                    "sample/step": _call_counter,
-                })
-        except (ImportError, Exception):
-            pass  # Wandb not available or not initialized
 
     # Return simple float (VERL handles the rest automatically)
     return total_reward

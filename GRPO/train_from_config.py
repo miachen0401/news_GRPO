@@ -133,11 +133,21 @@ def build_training_command(config: dict) -> list[str]:
         # Validation settings
         f"trainer.val_before_train={str(trainer_cfg.get('val_before_train', False)).lower()}",
         f"trainer.test_freq={trainer_cfg.get('val_interval', 0)}",  # VERL uses test_freq for periodic validation
-
+    ]
+    
+    # Add resume_from_path if specified (properly resumes training state including step counter)
+    if 'resume_from_path' in trainer_cfg and trainer_cfg['resume_from_path']:
+        cmd.append(f"trainer.resume_from_path={trainer_cfg['resume_from_path']}")
+        cmd.append(f"trainer.resume_mode=resume_path")  # Required for resume_from_path to work
+    # Fallback to load_checkpoint (only loads weights, not training state - step counter resets)
+    elif 'load_checkpoint' in trainer_cfg and trainer_cfg['load_checkpoint']:
+        cmd.append(f"++trainer.load_checkpoint={trainer_cfg['load_checkpoint']}")
+    
+    cmd.extend([
         # Optimization settings
         f"++trainer.mixed_precision={trainer_cfg['mixed_precision']}",
         f"++trainer.max_grad_norm={trainer_cfg['max_grad_norm']}",
-    ]
+    ])
 
     # Add wandb configuration if enabled
     if 'wandb' in trainer_cfg and trainer_cfg['wandb'].get('enabled', False):
@@ -147,6 +157,7 @@ def build_training_command(config: dict) -> list[str]:
             f"++trainer.wandb.tags={wandb_cfg['tags']}",
             f"++trainer.wandb.notes={wandb_cfg['notes']}",
         ])
+        
         #if wandb_cfg.get('entity'):
         #    cmd.append(f"++trainer.wandb.entity={wandb_cfg['entity']}")
 
@@ -189,6 +200,11 @@ def main():
         default="GRPO/config.yaml",
         help="Path to training configuration YAML file"
     )
+    parser.add_argument(
+        "--validate_only",
+        action="store_true",
+        help="Only validate VERL config and exit"
+    )
 
     args = parser.parse_args()
 
@@ -196,17 +212,54 @@ def main():
     logger.info(f"Loading configuration from: {args.config}")
     config = load_config(args.config)
 
-    # Add timestamp to experiment name for uniqueness
-    timestamp = datetime.now().strftime("%b%d%H%M")  # e.g., Dec241255
-    original_name = config['trainer']['experiment_name']
-    timestamped_name = f"{original_name}-{timestamp}"
-    config['trainer']['experiment_name'] = timestamped_name
+    # Check if resuming from checkpoint
+    trainer_cfg = config.get('trainer', {})
+    is_resuming = 'resume_from_path' in trainer_cfg and trainer_cfg['resume_from_path']
+    current_timestamp = datetime.now().strftime("%b%d%H%M")  # e.g., Dec260350
     
-    # Update checkpoint directory with timestamp
-    original_dir = config['trainer']['default_local_dir']
-    config['trainer']['default_local_dir'] = f"{original_dir}-{timestamp}"
-    
-    logger.info(f"Experiment name: {timestamped_name}")
+    if not is_resuming:
+        # Training from scratch: ckpt/grpo-<timestamp>, wandb: qwen-grpo-test-<timestamp>
+        project_name = trainer_cfg.get('project_name', 'training')
+        checkpoint_dir_name = f"grpo-{current_timestamp}"
+        
+        # Set checkpoint directory
+        config['trainer']['default_local_dir'] = f"ckpt/{checkpoint_dir_name}"
+        
+        # Set experiment name (this becomes the WandB run name)
+        wandb_run_name = f"{project_name}-{current_timestamp}"
+        config['trainer']['experiment_name'] = wandb_run_name
+        
+        logger.info(f"Training from scratch")
+        logger.info(f"Checkpoints will be saved to: {config['trainer']['default_local_dir']}")
+        logger.info(f"WandB/Experiment name: {wandb_run_name}")
+    else:
+        # Resuming: extract original checkpoint dir name from path
+        # Example: /path/to/ckpt/grpo-Dec260208/global_step_30 -> grpo-Dec260208
+        import re
+        resume_path = trainer_cfg['resume_from_path']
+        
+        # Extract checkpoint directory name (e.g., "grpo-Dec260208")
+        match = re.search(r'/ckpt/(grpo-[A-Z][a-z]{2}\d{6})', resume_path)
+        if match:
+            checkpoint_dir_name = match.group(1)  # e.g., "grpo-Dec260208"
+            original_timestamp = checkpoint_dir_name.split('-', 1)[1]  # e.g., "Dec260208"
+        else:
+            # Fallback if pattern doesn't match
+            logger.warning(f"Could not extract checkpoint dir from {resume_path}, using config values")
+            checkpoint_dir_name = config['trainer'].get('experiment_name', 'grpo')
+            original_timestamp = "unknown"
+        
+        # Keep original checkpoint directory for continuity
+        config['trainer']['default_local_dir'] = f"ckpt/{checkpoint_dir_name}"
+        
+        # Set experiment name to WandB name (VERL uses experiment_name as wandb run name)
+        project_name = trainer_cfg.get('project_name', 'training')
+        wandb_run_name = f"{project_name}-{original_timestamp}-resume-{current_timestamp}"
+        config['trainer']['experiment_name'] = wandb_run_name  # This becomes the WandB run name
+        
+        logger.info(f"Resuming from: {resume_path}")
+        logger.info(f"Checkpoints will continue in: {config['trainer']['default_local_dir']}")
+        logger.info(f"WandB/Experiment name: {wandb_run_name}")
 
     # Check for wandb API key in environment
     wandb_api_key = os.getenv("WANDB_API_KEY")
@@ -232,6 +285,10 @@ def main():
 
     # Build training command
     cmd = build_training_command(config)
+
+    # Override total_epochs to 0 if validate_only is set
+    if args.validate_only:
+        cmd.append("trainer.total_epochs=0")
 
     # Log training information
     logger.info("=" * 70)
