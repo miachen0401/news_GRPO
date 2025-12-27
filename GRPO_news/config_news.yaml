@@ -1,0 +1,100 @@
+# GRPO Configuration for News Classification
+# Binary classification task: event-based vs non-event-based news
+
+# Model Configuration
+model:
+  path: "Qwen/Qwen2.5-1.5B-Instruct"
+  use_remove_padding: true  # Enable for Flash Attention 2 (A100/H100 recommended)
+  enable_gradient_checkpointing: true  # Save memory
+  attn_implementation: "flash_attention_2"
+  dtype: "bfloat16"  # Load model in bfloat16 for Flash Attention 2 compatibility
+
+fsdp_config:
+  dtype: "bfloat16"
+  model_dtype: "bfloat16"
+
+# Data Configuration - News classification dataset
+data:
+  train_files: "data/news_classification/train.parquet"
+  val_files: "data/news_classification/val.parquet"
+  train_batch_size: 32  # Must be >= ppo_mini_batch_size
+  val_batch_size: 32
+  max_prompt_length: 1024
+  max_response_length: 256  # Increased for news analysis
+  dataloader_num_workers: 2
+
+# Rollout Configuration
+rollout:
+  name: "vllm"
+  tensor_model_parallel_size: 1
+  dtype: "bfloat16"
+  n: 8  # Number of rollout samples per prompt
+  temperature: 0.9
+  do_sample: true
+  log_prob_micro_batch_size: 2
+  gpu_memory_utilization: 0.6
+
+# Actor Training Configuration
+actor:
+  learning_rate: 1.0e-6
+  ppo_mini_batch_size: 32
+  ppo_micro_batch_size_per_gpu: 8
+  ppo_epochs: 1
+
+# Critic Training Configuration
+critic:
+  enable: false
+
+# Algorithm Configuration
+algorithm:
+  adv_estimator: "grpo"
+
+# Reward Function Configuration
+reward:
+  path: "GRPO_news/news_classification_reward.py"
+  function_name: "compute_score"
+
+# Training Configuration
+trainer:
+  n_gpus_per_node: 1
+  nnodes: 1
+  total_epochs: 20  # Adjust based on dataset size
+  save_freq: 32  # Save checkpoint every 32 steps
+  # resume_from_path: "/home/ubuntu/projects/news_GRPO/ckpt/grpo-Dec270410/global_step_96"
+  mixed_precision: "bfloat16"
+  val_before_train: true  # Run validation before training starts
+  val_interval: 20  # Run validation every N steps
+
+  # Pass@k validation plugin (runs in background, logs to wandb)
+  validation:
+    enabled: true  # Enable validation plugin
+    interval: 20  # Run pass@k validation every N steps
+    reward_log: "reward_samples_news.log"  # Path to reward samples log
+    training_log: "training.log"  # Path to training log
+    log_dir: "validation_logs"  # Directory to save validation logs
+    check_interval: 30  # Check for new steps every N seconds
+
+  max_grad_norm: 1.0
+
+  # Logging
+  logger: ['console', 'wandb']  # Console and wandb for monitoring
+  project_name: "qwen-grpo-news"
+  experiment_name: "grpo-news"  # Will be automatically timestamped
+  default_local_dir: "ckpt"  # Will be combined with experiment_name automatically
+
+  # Wandb configuration
+  wandb:
+    enabled: true
+    project: "qwen-grpo-news"
+    entity: ~
+    tags: ["news-classification", "grpo", "news-classification", "a100"]
+    notes: "News classification training"
+
+# Environment Variables
+environment:
+  pytorch_alloc_conf: "expandable_segments:True"
+  tokenizers_parallelism: "true"
+  # Reward logging configuration
+  reward_log_sample_rate: "5"  # Log every 5 questions for monitoring
+  reward_enable_logging: "true"  # Enable file logging (needed for validation)
+  reward_enable_console_output: "false"  # Enable console output (disabled by default for performance)

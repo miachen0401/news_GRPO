@@ -30,7 +30,7 @@ def format_gsm8k_example(example: dict, idx: int, split: str, prompt_format: str
         example: Raw dataset example containing 'question' and 'answer'
         idx: Index of the example
         split: Dataset split ('train' or 'test')
-        prompt_format: Format type for the prompt ('grpo', 'partial', or 'default')
+        prompt_format: Format type for the prompt ('grpo')
 
     Returns:
         Formatted example with prompt and reward model configuration
@@ -73,7 +73,7 @@ def prepare_gsm8k_dataset(
     Args:
         output_dir: Directory to save prepared dataset files
         val_split_ratio: Ratio of training data to use for validation (default: 0.1)
-        prompt_format: Format type for prompts ('grpo', 'partial', or 'default')
+        prompt_format: Format type for prompts ('grpo')
     """
     logger.info("Starting GSM8K dataset preparation")
 
@@ -153,8 +153,8 @@ if __name__ == "__main__":
         "--prompt-format",
         type=str,
         default="grpo",
-        choices=["grpo", "partial", "default"],
-        help="Format type for prompts (grpo=XML format, partial=#### format)"
+        choices=["grpo"],
+        help="Format type for prompts (grpo=XML format)"
     )
     
     args = parser.parse_args()

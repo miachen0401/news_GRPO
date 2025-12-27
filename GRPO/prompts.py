@@ -28,25 +28,12 @@ He gives away 2 apples to Mary.
 3
 </answer>"""
 
-# Default prompt (matches original GSM8K format)
-GSM8K_PROMPT_DEFAULT = GSM8K_PROMPT_GRPO_FORMAT
-
 
 def get_gsm8k_prompt(format_type: str = "grpo") -> str:
     """
     Get the appropriate GSM8K prompt based on reward function format.
     
     Args:
-        format_type: One of 'grpo', 'partial', or 'default'
-        
-    Returns:
-        Formatted prompt string
+        format_type: 'grpo'
     """
-    prompts = {
-        "grpo": GSM8K_PROMPT_GRPO_FORMAT,
-        "partial": GSM8K_PROMPT_PARTIAL_FORMAT,
-        "default": GSM8K_PROMPT_DEFAULT,
-    }
-    
-    return prompts.get(format_type, GSM8K_PROMPT_DEFAULT)
-
+    return GSM8K_PROMPT_GRPO_FORMAT

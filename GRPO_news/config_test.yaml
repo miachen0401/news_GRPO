@@ -1,0 +1,101 @@
+# GRPO Test Configuration
+# Optimized for quick training loop testing with small dataset (50 samples)
+# Use this for debugging and validating your setup before full training
+
+# Model Configuration
+model:
+  path: "Qwen/Qwen2.5-1.5B-Instruct"
+  use_remove_padding: true  # Enable for Flash Attention 2 (A100/H100 recommended)
+  enable_gradient_checkpointing: true  # Save memory
+  attn_implementation: "flash_attention_2"
+  dtype: "bfloat16"  # Load model in bfloat16 for Flash Attention 2 compatibility
+
+fsdp_config:
+  dtype: "bfloat16"
+  model_dtype: "bfloat16"
+
+# Data Configuration - Small test dataset
+data:
+  train_files: "data/gsm8k/train_sample.parquet"  # 50 samples
+  val_files: "data/gsm8k/val_sample.parquet"      # 10 samples
+  train_batch_size: 32  # Must be >= ppo_mini_batch_size
+  val_batch_size: 32
+  max_prompt_length: 512
+  max_response_length: 256
+  dataloader_num_workers: 2  # Reduced for test
+
+# Rollout Configuration
+rollout:
+  name: "vllm"
+  tensor_model_parallel_size: 1
+  dtype: "bfloat16"
+  n: 8  # Keep same for testing
+  temperature: 0.9
+  do_sample: true
+  log_prob_micro_batch_size: 2
+  gpu_memory_utilization: 0.6
+
+# Actor Training Configuration
+actor:
+  learning_rate: 1.0e-6
+  ppo_mini_batch_size: 32
+  ppo_micro_batch_size_per_gpu: 8
+  ppo_epochs: 1
+
+# Critic Training Configuration
+critic:
+  enable: false
+
+# Algorithm Configuration
+algorithm:
+  adv_estimator: "grpo"
+
+# Reward Function Configuration
+reward:
+  path: "GRPO/gsm8k_reward_grpo_format.py"
+  function_name: "compute_score"
+
+# Training Configuration - Optimized for testing
+trainer:
+  n_gpus_per_node: 1
+  nnodes: 1
+  total_epochs: 5  # Only 5 epoch for testing
+  save_freq: 50  # Save checkpoint every 10 steps for testing
+  # resume_from_path: "/home/ubuntu/projects/news_GRPO/ckpt/grpo-Dec260434/global_step_20"
+  mixed_precision: "bfloat16"
+  val_before_train: true    # Run validation before training starts
+  val_interval: 20  # Run validation every N steps (set to 0 to disable VERL validation)
+  
+  # Pass@k validation plugin (runs in background, logs to wandb)
+  validation:
+    enabled: true  # Enable validation plugin
+    interval: 20  # Run pass@k validation every N steps
+    reward_log: "reward_samples.log"  # Path to reward samples log
+    training_log: "training.log"  # Path to training log
+    log_dir: "validation_logs"  # Directory to save validation logs
+    check_interval: 30  # Check for new steps every N seconds
+
+  max_grad_norm: 1.0
+
+  # Logging
+  logger: ['console', 'wandb']  # Console and wandb for monitoring
+  project_name: "qwen-grpo-test"
+  experiment_name: "grpo"  # Will be automatically timestamped
+  default_local_dir: "ckpt"  # Will be combined with experiment_name automatically
+  
+  # Wandb configuration (automatically enabled if WANDB_API_KEY is set)
+  wandb:
+    enabled: true
+    project: "qwen-grpo-test"
+    entity: ~
+    tags: ["test", "grpo", "gsm8k", "a100"]
+    notes: "Test run with reward logging every 5 samples"
+
+# Environment Variables
+environment:
+  pytorch_alloc_conf: "expandable_segments:True"
+  tokenizers_parallelism: "true"
+  # Reward logging configuration
+  reward_log_sample_rate: "5"  # Log every 5 questions for monitoring
+  reward_enable_logging: "true"  # Enable file logging (needed for validation)
+  reward_enable_console_output: "false"  # Enable console output (disabled by default for performance, enable for debug)
